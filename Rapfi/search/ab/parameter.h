@@ -19,6 +19,7 @@
 #pragma once
 
 #include "../../core/types.h"
+#include "../../tuning/tunemap.h"
 
 #include <array>
 #include <cmath>
@@ -198,14 +199,20 @@ constexpr Depth complexityReduction(bool trivialMove, bool importantMove, bool d
 template <Rule R>
 inline int policyPruningScore(Depth d)
 {
-    return 339 - int(d * 57);
+    return 340 - int(d * 57);
 }
+
+inline int policy_reduction_d0 = 457;
+inline int policy_reduction_d1 = 0;
+
+TUNE(policy_reduction_d0);
+TUNE(policy_reduction_d1, 0, 80);
 
 /// Policy reduction score at given depth. Moves lower than this will do lmr.
 template <Rule R>
 inline int policyReductionScore(Depth d)
 {
-    return 457;
+    return policy_reduction_d0 - int(d * policy_reduction_d1);
 }
 
 }  // namespace Search::AB
