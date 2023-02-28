@@ -14,7 +14,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ */
 
 #include "history.h"
 
@@ -54,8 +54,10 @@ void HistoryTracker::updateBestmoveStats(Depth depth, Pos bestMove, Value bestVa
         updateQuietStats(bestMove, bonus);
 
         // Decrease stats for all the other played non-best quiet moves
-        for (int i = 0; i < quietCount; i++)
+        for (int i = 0; i < quietCount; i++) {
             searchData->mainHistory[self][quietsSearched[i]][HIST_QUIET] << -bonus;
+            updateContinuationStats(quietsSearched[i], -bonus);
+        }
     }
 
     // Decrease stats for all the other played non-best attack moves
@@ -85,8 +87,10 @@ void HistoryTracker::updateTTMoveStats(Depth depth, Pos ttMove, Value ttValue, V
             if (ttValue >= beta)
                 updateQuietStats(ttMove, bonus);
             // Penalty for a quiet ttMove that fails low
-            else
+            else {
                 searchData->mainHistory[self][ttMove][HIST_QUIET] << -bonus;
+                updateContinuationStats(ttMove, -bonus);
+            }
         }
     }
 }
@@ -97,6 +101,17 @@ void HistoryTracker::updateQuietStats(Pos move, int bonus)
 
     searchData->mainHistory[self][move][HIST_QUIET] << bonus;
     searchStack->setKiller(move);  // Update killer heruistic move
+    updateContinuationStats(move, bonus);
+}
+
+void HistoryTracker::updateContinuationStats(Pos move, int bonus)
+{
+    Color self = board.sideToMove(), oppo = ~self;
+    bool  oppo4 = board.p4Count(oppo, A_FIVE) || board.p4Count(oppo, B_FLEX4);
+    for (int i : {1, 2, 4}) {
+        if ((searchStack - i)->currentMove)
+            (*(searchStack - i)->contHist)[move] << bonus;
+    }
 }
 
 }  // namespace Search::AB

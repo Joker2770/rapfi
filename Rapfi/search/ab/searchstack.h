@@ -20,6 +20,7 @@
 
 #include "../../core/pos.h"
 #include "../../core/types.h"
+#include "../history.h"
 
 #include <vector>
 
@@ -30,18 +31,19 @@ namespace Search::AB {
 /// objects, indexed by the current ply.
 struct SearchStack
 {
-    Pos *const pv;
-    const int  ply;
-    int        moveCount;
-    int        doubleExtensionCount;
-    int        dbValueDepth;
-    int        statScore;
-    Value      staticEval;
-    Pos        currentMove;
-    Pos        skipMove;
-    Pos        killers[2];
-    Pattern4   moveP4[SIDE_NB];
-    bool       ttPv;
+    Pos *const   pv;
+    const int    ply;
+    int          moveCount;
+    int          doubleExtensionCount;
+    int          dbValueDepth;
+    int          statScore;
+    Value        staticEval;
+    Pos          currentMove;
+    Pos          skipMove;
+    Pos          killers[2];
+    Pattern4     moveP4[SIDE_NB];
+    bool         ttPv;
+    MoveHistory *contHist;
 
     /// Append current move and to the end of child PV.
     void updatePv(Pos move)
@@ -70,13 +72,14 @@ struct SearchStack
 
 /// StackArray class allocates and inits the entire stacks and triangular
 /// pv-table up to max ply with init static evaluation.
-class StackArray : std::vector<SearchStack>
+class StackArray : public std::vector<SearchStack>
 {
 public:
     static constexpr int plyBeforeRoot = 4;
     static constexpr int plyAfterMax   = 2;
 
-    StackArray(int maxPly, Value initStaticEval) : triPvTable((maxPly + 1) * (maxPly + 2) / 2)
+    StackArray(int maxPly, Value initStaticEval, MoveHistory *initMoveHist)
+        : triPvTable((maxPly + 1) * (maxPly + 2) / 2)
     {
         auto nextTriPvIndex = [&, idx = 0](int ply) mutable -> Pos * {
             Pos *curPv = nullptr;
@@ -91,9 +94,11 @@ public:
         reserve(maxPly + plyBeforeRoot + plyAfterMax);
         for (int i = -plyBeforeRoot; i < maxPly + plyAfterMax; i++)
             push_back(SearchStack {nextTriPvIndex(i), i});
-        // Initialize static evaluation for plies before root
-        for (int i = 0; i <= plyBeforeRoot; i++)
+        // Initialize static evaluation and contHist for plies before root
+        for (int i = 0; i <= plyBeforeRoot; i++) {
             (*this)[i].staticEval = initStaticEval;
+            (*this)[i].contHist   = initMoveHist;
+        }
     }
     SearchStack *rootStack() { return &(*this)[plyBeforeRoot]; }
 

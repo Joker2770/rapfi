@@ -77,6 +77,7 @@ void ABSearchData::clearData()
     singularRoot    = false;
     mainHistory.init(0);
     counterMoveHistory.init(std::make_pair(Pos::NONE, NONE));
+    continuationHistory.initAs<int16_t>(0);
 }
 
 /// Clear main thread states (and TT) between different games.
@@ -238,16 +239,16 @@ void ABSearcher::searchMain(MainSearchThread &th)
 /// until the stop condition is reached. Results are updated to thread bounded with the board.
 void ABSearcher::search(SearchThread &th)
 {
-    ABSearchData     &sd        = *th.searchDataAs<ABSearchData>();
-    SearchOptions    &options   = th.options();
-    Value             initValue = Evaluation::evaluate(*th.board, options.rule);
-    StackArray        stackArray(MAX_PLY, initValue);
+    ABSearchData     &sd                  = *th.searchDataAs<ABSearchData>();
+    SearchOptions    &options             = th.options();
     Value             bestValue           = -VALUE_INFINITE;
     Pos               lastBestMove        = Pos::NONE;
     int               lastMoveChangeDepth = 0;
     float             timeReduction = 1.0f, totalBestMoveChanges = 0.0f;
     int               firstMateDepth = 0, firstSingularDepth = 0;
     MainSearchThread *mainThread = (&th == th.threads.main() ? th.threads.main() : nullptr);
+    Value             initValue  = Evaluation::evaluate(*th.board, options.rule);
+    StackArray        stackArray(MAX_PLY, initValue, &sd.continuationHistory[OPPO4_NO][Pos::NONE]);
 
     // Init search depth range
     int maxDepth   = std::min(options.maxDepth, std::clamp(Config::MaxSearchDepth, 2, MAX_DEPTH));
@@ -858,6 +859,7 @@ Value search(Board &board, SearchStack *ss, Value alpha, Value beta, Depth depth
         && ss->staticEval >= beta + nullMoveMargin(depth)) {
         Depth r         = nullMoveReduction(depth);
         ss->currentMove = Pos::PASS;
+        ss->contHist    = &searchData->continuationHistory[OPPO4_NO][Pos::PASS];
 
         board.doPassMove();
         TT.prefetch(board.zobristKey());
@@ -929,12 +931,15 @@ moves_loop:
     bool likelyFailLow = PvNode && ttHit && (ttBound & BOUND_UPPER) && ttDepth >= depth
                          && ttValue < alpha + failLowMargin(depth);
 
+    const MoveHistory *contHist[] = {(ss - 1)->contHist, (ss - 2)->contHist, (ss - 4)->contHist};
+
     MovePicker mp(Rule,
                   board,
                   MovePicker::ExtraArgs<MovePicker::MAIN> {
                       ttMove,
                       &searchData->mainHistory,
                       &searchData->counterMoveHistory,
+                      contHist,
                   });
 
     // Step 11. Loop through all legal moves until no moves remain
@@ -1093,6 +1098,7 @@ moves_loop:
         // Calculate new depth for this move
         Depth newDepth           = depth - 1.0f + extension;
         ss->currentMove          = move;
+        ss->contHist             = &searchData->continuationHistory[bool(oppo4)][move];
         ss->doubleExtensionCount = (ss - 1)->doubleExtensionCount + (extension >= 2.0f);
 
         // Step 14. Make the move
@@ -1571,12 +1577,13 @@ Value vcfsearch(Board &board, SearchStack *ss, Value alpha, Value beta, Depth de
     }
 
     // Step 7. Loop through the moves until no moves remain or a beta cutoff occurs.
-    MovePicker mp(
-        Rule,
-        board,
-        MovePicker::ExtraArgs<MovePicker::QVCF> {ttMove,
-                                                 depth,
-                                                 {(ss - 2)->moveP4[self], (ss - 4)->moveP4[self]}});
+    MovePicker mp(Rule,
+                  board,
+                  MovePicker::ExtraArgs<MovePicker::QVCF> {
+                      ttMove,
+                      depth,
+                      {(ss - 2)->moveP4[self], (ss - 4)->moveP4[self]},
+                  });
 
     while (Pos move = mp()) {
         assert(board.isEmpty(move));

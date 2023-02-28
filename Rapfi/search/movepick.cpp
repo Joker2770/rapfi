@@ -14,7 +14,7 @@
  *
  *  You should have received a copy of the GNU General Public License
  *  along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
+ */
 
 #include "movepick.h"
 
@@ -83,6 +83,7 @@ MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::ROOT
     : board(board)
     , mainHistory(nullptr)
     , counterMoveHistory(nullptr)
+    , continuationHistory(nullptr)
     , stage(ALLMOVES)
     , rule(rule)
     , ttMove(Pos::NONE)
@@ -125,6 +126,7 @@ MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::MAIN
     : board(board)
     , mainHistory(args.mainHistory)
     , counterMoveHistory(args.counterMoveHistory)
+    , continuationHistory(args.continuationHistory)
     , rule(rule)
     , allowPlainB4InVCF(false)
     , hasPolicy(false)
@@ -166,6 +168,8 @@ template <>
 MovePicker::MovePicker(Rule rule, const Board &board, ExtraArgs<MovePicker::QVCF> args)
     : board(board)
     , mainHistory(nullptr)
+    , counterMoveHistory(nullptr)
+    , continuationHistory(nullptr)
     , rule(rule)
     , allowPlainB4InVCF(
           args.depth >= DEPTH_QVCF_FULL
@@ -276,6 +280,17 @@ void MovePicker::scoreMoves()
                     m.score += CounterMoveBonus;
             }
         }
+
+        if constexpr (bool(Type & CONT_HISTORY)) {
+            if (c.pattern4[self] >= H_FLEX3)
+                ;
+            // m.score += (*continuationHistory[0])[m.pos] / 512     // (ss-1)
+            //            + (*continuationHistory[1])[m.pos] / 512;  // (ss-2)
+            else
+                m.score += (*continuationHistory[0])[m.pos] / 1024     // (ss-1)
+                           + (*continuationHistory[1])[m.pos] / 2048   // (ss-2)
+                           + (*continuationHistory[2])[m.pos] / 2048;  // (ss-4)
+        }
     }
 }
 
@@ -298,7 +313,7 @@ top:
         curMove = moves;
         endMove = generate<ALL>(board, curMove);
 
-        scoreMoves<ScoreType(BALANCED | POLICY | MAIN_HISTORY | COUNTER_MOVE)>();
+        scoreMoves<ScoreType(BALANCED | POLICY | MAIN_HISTORY | COUNTER_MOVE | CONT_HISTORY)>();
         fastPartialSort(curMove, endMove, 0);
 
         stage = ALLMOVES;
@@ -320,7 +335,7 @@ top:
         endMove = generate<DEFEND_FOUR>(board, curMove);
         endMove = generate<VCF>(board, endMove);
 
-        scoreMoves<ScoreType(BALANCED | POLICY | MAIN_HISTORY)>();
+        scoreMoves<ScoreType(BALANCED | POLICY | MAIN_HISTORY | CONT_HISTORY)>();
         fastPartialSort(curMove, endMove, 0);
 
         stage = ALLMOVES;
@@ -344,7 +359,7 @@ top:
 
         endMove = generate<VCF>(board, endMove);
 
-        scoreMoves<ScoreType(BALANCED | POLICY | MAIN_HISTORY)>();
+        scoreMoves<ScoreType(BALANCED | POLICY | MAIN_HISTORY | CONT_HISTORY)>();
         fastPartialSort(curMove, endMove, 0);
 
         stage = ALLMOVES;

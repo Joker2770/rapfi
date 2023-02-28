@@ -40,8 +40,9 @@ struct ABSearchData : SearchData
     std::atomic<int> completedDepth;   /// Previously completed depth
     std::atomic<int> bestMoveChanges;  /// How many time best move has changed in this search
 
-    MainHistory        mainHistory;         /// Heuristic history table
-    CounterMoveHistory counterMoveHistory;  /// Counter move history table
+    MainHistory         mainHistory;          /// Heuristic history table
+    CounterMoveHistory  counterMoveHistory;   /// Counter move history table
+    ContinuationHistory continuationHistory;  /// Continuation history table
 
     ~ABSearchData() = default;
     void clearData() override;

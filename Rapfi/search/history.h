@@ -34,32 +34,38 @@ namespace Search {
 /// @tparam ValueT The base value type of the array
 /// @tparam Range The range [-Range, Range] of the value
 /// @tparam Shape The size list of multiple dimensions, at least have one.
-template <typename ValueT, int Range, int... Shape>
+template <typename T, int Range, int... Shape>
 struct HistTable
 {
     /// Entry stores a single value in the table. It acts as a wrapper around the value
     /// and overloads operator<<() function to ensure that values does not go out of bound.
     struct Entry
     {
-        void    operator=(const ValueT &v) { value = v; }
-        ValueT *operator&() { return &value; }
-                operator const ValueT &() const { return value; }
-        ValueT  get() const { return value; }
-        void    operator<<(int bonus)
+        void operator=(const T &v) { value = v; }
+        T   *operator&() { return &value; }
+             operator const T &() const { return value; }
+        T    get() const { return value; }
+        void operator<<(int bonus)
         {
-            static_assert(Range <= std::numeric_limits<ValueT>::max());
+            static_assert(Range <= std::numeric_limits<T>::max());
             assert(std::abs(bonus) <= Range);  // Ensure bonus is in [-Range, Range]
             value += bonus - value * std::abs(bonus) / Range;
             assert(std::abs(value) <= Range);
         }
 
     private:
-        ValueT value;
+        T value;
     };
 
     auto       &operator[](std::size_t index) { return table[index]; }
     const auto &operator[](std::size_t index) const { return table[index]; }
-    void        init(const ValueT &fillValue)
+    void        init(const T &fillValue)
+    {
+        T *p = reinterpret_cast<T *>(table);
+        std::fill_n(p, sizeof(table) / sizeof(T), fillValue);
+    }
+    template <typename ValueT>
+    void initAs(const ValueT &fillValue)
     {
         ValueT *p = reinterpret_cast<ValueT *>(table);
         std::fill_n(p, sizeof(table) / sizeof(ValueT), fillValue);
@@ -70,15 +76,21 @@ private:
 };
 
 /// The type of a main history record.
-enum MoveHistoryType { HIST_ATTACK, HIST_QUIET, MAIN_HIST_TYPE_NB };
+enum MoveHistoryType { HIST_ATTACK, HIST_QUIET, MOVE_HIST_TYPE_NB };
+enum Oppo4HistoryType { OPPO4_NO, OPPO4_YES, OPPO4_NB };
 
 /// MainHistory records how often a certain type of move has been successful or unsuccessful
 /// (causing a beta cutoff) during the current search. It is indexed by color of the move,
 /// move's position, and the move's history type.
-typedef HistTable<int16_t, 10692, SIDE_NB, FULL_BOARD_CELL_COUNT, MAIN_HIST_TYPE_NB> MainHistory;
+typedef HistTable<int16_t, 10692, SIDE_NB, FULL_BOARD_CELL_COUNT, MOVE_HIST_TYPE_NB> MainHistory;
 
 /// CounterMoveHistory records a natural response of moves irrespective of the actual position.
 /// It is indexed by color of the previous move, previous move's position and current move's type.
 typedef HistTable<std::pair<Pos, Pattern4>, 0, SIDE_NB, MAX_MOVES> CounterMoveHistory;
+
+/// CounterMoveHistory records the combined history of a pair of moves irrespective of the
+/// actual position. It is indexed by oppo4, the previous move and the current move.
+typedef HistTable<int16_t, 10692, FULL_BOARD_CELL_COUNT> MoveHistory;
+typedef HistTable<MoveHistory, 0, OPPO4_NB, FULL_BOARD_CELL_COUNT> ContinuationHistory;
 
 }  // namespace Search

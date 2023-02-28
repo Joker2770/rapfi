@@ -46,9 +46,9 @@ public:
     constexpr int x() const { return (_pos & 31) - BOARD_BOUNDARY; }
     constexpr int y() const { return (_pos >> 5) - BOARD_BOUNDARY; }
     constexpr     operator int() const { return _pos; }
-    inline bool   valid() const { return _pos >= PASS._pos && _pos < FULL_BOARD_END._pos; }
-    inline int    moveIndex() const { return y() * ACTUAL_BOARD_SIZE + x(); }
-    inline bool   isInBoard(int boardWidth, int boardHeight) const;
+    bool valid() const { return _pos >= FULL_BOARD_START._pos && _pos < FULL_BOARD_END._pos; }
+    int  moveIndex() const { return y() * ACTUAL_BOARD_SIZE + x(); }
+    bool isInBoard(int boardWidth, int boardHeight) const;
 
     static int distance(Pos p1, Pos p2);
     static int lineDistance(Pos p1, Pos p2);
@@ -60,7 +60,7 @@ public:
 };
 
 inline constexpr Pos Pos::NONE {0};
-inline constexpr Pos Pos::PASS {-1};
+inline constexpr Pos Pos::PASS {1};
 inline constexpr Pos Pos::FULL_BOARD_START {0};
 inline constexpr Pos Pos::FULL_BOARD_END {FULL_BOARD_CELL_COUNT};
 

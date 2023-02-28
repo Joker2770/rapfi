@@ -55,8 +55,11 @@ struct HistoryTracker
     /// Update move sorting heuristics when return with a ttMove.
     void updateTTMoveStats(Depth depth, Pos ttMove, Value ttValue, Value beta);
 
-    /// Updates move sorting heuristics for a quiet best move.
+    /// Update move sorting heuristics for a quiet best move.
     void updateQuietStats(Pos move, int bonus);
+
+    /// Update move pairs formed by moves from ply -1,-2,-4 with current move.
+    void updateContinuationStats(Pos move, int bonus);
 
 private:
     const Board  &board;
